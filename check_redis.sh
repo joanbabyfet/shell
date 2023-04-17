@@ -1,0 +1,35 @@
+#!/bin/bash
+# 监控redis服务与挂掉重启
+
+# 导入文件
+. /root/scripts/notify.sh
+
+function send_notify() {
+ text=$1
+ ret=$(send_tg $text)
+ echo "$(date +%Y-%m-%d%n%H:%M:%S) : $ret" >> /root/scripts/check_redis.log
+}
+
+function restart_service() {
+ $(systemctl start redis)
+}
+
+# -w 精确匹配, -v 排除grep, 不加会导致进程数量不准确
+count=$(ps -ef|grep -w redis|grep -v grep|wc -l)
+
+if [ $count != 1 ]
+then
+ $(send_notify "檢測到redis宕機,正嘗試重啟")
+ $(restart_service)
+ sleep 3
+
+ if [ $(ps -ef|grep -w redis|grep -v grep|wc -l) != 1 ]
+ then
+  $(send_notify "redis重启失败,请求人工介入")
+ else
+  $(send_notify "redis重启成功,守护进程将持续监控")
+ fi
+else
+  echo "[$(date +%Y-%m-%d%n%H:%M:%S)] redis运行正常" >> /root/scripts/check_redis.log
+fi
+
